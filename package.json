@@ -3,14 +3,13 @@
   "version": "1.0.0",
   "description": "Boilerplate NodeJS Microservice Code",
   "scripts": {
-    "test": "mocha test"
+    "test": "nyc --reporter=text mocha test"
   },
   "devDependencies": {
     "amqplib": "0.5.5",
     "chai": "4.2.0",
     "mocha": "6.2.0",
-    "moment-timezone": "0.5.26",
     "nyc": "14.1.1",
-    "winston": "3.2.1"
+    "uuid": "3.3.2"
   }
 }

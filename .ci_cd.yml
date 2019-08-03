@@ -1,0 +1,15 @@
+stages:
+  - test
+  - deploy
+
+variables:
+  MESSAGEBUS_URL: amqp://rabbitmq/
+services:
+  - rabbitmq
+before_script:
+  - npm install
+
+test_simple:
+  stage: test
+  script: 
+    - npm test
