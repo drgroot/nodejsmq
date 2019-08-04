@@ -16,7 +16,8 @@ module.exports = (
   routing_key,
   onMsg,
   connected = () => true,
-  exchange_type = 'topic'
+  exchange_type = 'topic',
+  onSentMsg = () => true
 ) => {
   let channel = null;
 
@@ -31,7 +32,7 @@ module.exports = (
         .then(queue =>
           channel.bindQueue(queue.queue, exchange_name, routing_key)
             .then(
-              () => channel.consume(queue.queue, msg => consume(channel, onMsg, msg))
+              () => channel.consume(queue.queue, msg => consume(channel, onMsg, msg, onSentMsg))
             )
             .then(() => console.log(`Consuming on ${queue.queue}`))
             .then(() => Promise.resolve(connected(channel)))
@@ -47,7 +48,7 @@ module.exports = (
   }
 }
 
-let consume = (channel, onMsg, msg) => onMsg(channel, msg)
+let consume = (channel, onMsg, msg, onSentMsg) => onMsg(channel, msg)
   .then(results => {
     if (results === null) {
       channel.nack(msg, false, false);
@@ -77,4 +78,5 @@ let consume = (channel, onMsg, msg) => onMsg(channel, msg)
       );
     }
     return Promise.resolve(channel.ack(msg));
-  });
+  })
+  .then(() => onSentMsg());

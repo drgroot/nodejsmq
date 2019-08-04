@@ -4,6 +4,7 @@ const publish = require('./messageBusPublish.js');
 
 module.exports = {
   consume: require('./messageBusConsume.js'),
+  log: require('./messageBusLogger.js'),
 
   publish_noResponse: publish.noResponse,
   publish_getResponse: publish.getResponse,

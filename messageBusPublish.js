@@ -20,9 +20,12 @@ module.exports = {
   ) => connection
     .then(conn => conn.createChannel())
     .then(channel =>
-      channel.assertQueue('', { durable: false })
-        .then(queue =>
-          sendMessageResponse(channel, queue.queue, exchange_name, routing_key, message)
+      channel.assertExchange(exchange_name, exchange_type)
+        .then(() =>
+          channel.assertQueue('', { durable: false })
+            .then(queue =>
+              sendMessageResponse(channel, queue.queue, exchange_name, routing_key, message)
+            )
         )
     ),
 }
