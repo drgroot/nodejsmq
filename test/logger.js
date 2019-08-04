@@ -3,6 +3,7 @@ const chai = require('chai');
 const messageBus = require('../');
 
 describe('Logger', function () {
+  process.env.NODE_ENV = 'production';
 
   it('Should log and filter by level', () => {
     let consumer1 = null;
@@ -31,6 +32,6 @@ describe('Logger', function () {
     })
       .then(() => consumer1.disconnect())
       .then(() => consumer2.disconnect());
-  })
+  });
 
 });
