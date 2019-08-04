@@ -13,6 +13,7 @@ describe('Publisher', function () {
         (channel, msg) => {
           chai.assert.strictEqual(JSON.parse(msg.content.toString()), 'hi');
           resolve();
+          return Promise.resolve('hi');
         },
         () => messageBus.publish_noResponse('hi', 'my-exhange', 'rpc_queue')
       )

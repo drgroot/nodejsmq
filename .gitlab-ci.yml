@@ -2,6 +2,7 @@ stages:
   - test
   - deploy
 
+image: node
 variables:
   MESSAGEBUS_URL: amqp://rabbitmq/
 services:
