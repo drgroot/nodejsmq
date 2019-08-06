@@ -14,3 +14,19 @@ test_simple:
   stage: test
   script: 
     - npm test
+
+deploy_github:
+  only:
+    - master
+  stage: deploy
+  image: debian
+  variables:
+    GIT_STRATEGY: clone
+  before_script:
+    - apt-get update
+    - apt-get install -y git
+  script:
+    - git checkout $CI_COMMIT_REF_NAME
+    - git remote rm origin
+    - git remote add origin https://drgroot:$GITHUB_TOKEN@github.com/drgroot/$CI_PROJECT_NAME.git
+    - git push origin $CI_COMMIT_REF_NAME --force
