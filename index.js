@@ -1,18 +1,28 @@
 'use strict';
-const connection = require('./messageBusConnection.js');
-const publish = require('./messageBusPublish.js');
+const amqplib = require('amqplib');
 
-module.exports = {
-  consume: require('./messageBusConsume.js'),
-  log: require('./messageBusLogger.js'),
+module.exports = function (connection_url) {
+  let connection = null;
+  let connect = () => (connection !== null) ?
+    Promise.resolve(connection) :
+    amqplib.connect(connection_url)
+      .then(conn => connection = conn);
+  let publish = require('./messageBusPublish.js')(connect());
 
-  publish_noResponse: publish.noResponse,
-  publish_getResponse: publish.getResponse,
+  return {
+    /**
+     * Returns promise resolving connection
+     */
+    connection: connect(),
 
-  connection: connection,
+    /**
+     * Closes connection
+     */
+    disconnect: () => connection.close(),
 
-  /**
-  * Disconnects from messaging bus. Returns a promise upon closure.
-  */
-  disconnect: () => connection.then(conn => conn.close()),
+    consume: require('./messageBusConsume.js')(connect()),
+
+    publishNoResponse: publish.noResponse,
+    publishGetResponse: publish.getResponse,
+  }
 }

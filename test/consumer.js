@@ -1,65 +1,90 @@
 'use strict';
 const chai = require('chai');
-const messageBus = require('../');
+let url = (process.env['MESSAGEBUS_URL']) ?
+  process.env['MESSAGEBUS_URL'] :
+  'amqp://127.0.0.1';
 
 describe('Consumer', function () {
+  let rabbitMQ = null;
+  let consumer = null;
 
-  it('Should stop consuming gracefully', () => {
-    let consumer = null;
-    return new Promise(resolve =>
-      consumer = messageBus.consume(
-        'rpc-queue',
-        'my-exhange',
-        '#',
-        () => { },
-        () => consumer.disconnect()
-          .then(() => resolve())
+  before(() => rabbitMQ = require('../')(url));
+  afterEach(() => consumer.disconnect());
+
+  it('Should stop consuming gracefully', () =>
+    new Promise(resolve =>
+      consumer = rabbitMQ.consume(
+        'rpc-queue', () => Promise.resolve(true), {
+          onConsuming: () => resolve()
+        }
       )
     )
-  });
+  );
+
+  it('Should follow routing rules', () =>
+    new Promise(resolve =>
+      consumer = rabbitMQ.consume('rpc-queue', () => Promise.resolve('l'), {
+        exchangeName: 'myExchange',
+        routingKey: '*.log',
+        assertExchangeType: 'topic',
+        onConsuming: () =>
+          rabbitMQ.publishGetResponse('my message', 'random.log', 'myExchange')
+            .then(response => {
+              response = JSON.parse(response.toString());
+              chai.assert.strictEqual(response.results[0], 'l');
+              chai.assert.isNull(response.error);
+              chai.assert.isTrue(response.is_success);
+              resolve();
+            })
+      })
+    )
+  )
+
+  it('Should nack the message on null response', () =>
+    new Promise((resolve, reject) =>
+      consumer = rabbitMQ.consume('rpc-queue', () => Promise.resolve(null), {
+        onConsuming: () =>
+          rabbitMQ.publishGetResponse('asdad', 'rpc-queue')
+            .then(() => reject('Should not get resolve')),
+        onSentMsg: () => resolve()
+      })
+    )
+  )
 
   it('Should ack knowledge message using promise', () =>
-    new Promise(resolve => {
-      let consumer = messageBus.consume(
-        'rpc-queue',
-        'my-exhange',
-        '*queue',
-        (channel, msg) => {
-          chai.assert.strictEqual(JSON.parse(msg.content.toString()), 'hi');
-          return Promise.resolve('bye');
-        }, () =>
-          messageBus.publish_getResponse('hi', 'my-exhange', 'lolmy-queue')
-            .then(newMessage => {
-              newMessage = JSON.parse(newMessage.toString());
-              chai.assert.strictEqual(newMessage.results[0], 'bye');
-              chai.assert.isNull(newMessage.error);
-              chai.assert.isTrue(newMessage.is_success);
+    new Promise(resolve =>
+      consumer = rabbitMQ.consume(
+        'rpc-queue', () => Promise.resolve('Response'),
+        {
+          onConsuming: () =>
+            rabbitMQ.publishGetResponse('hi', 'rpc-queue')
+              .then(response => {
+                response = JSON.parse(response.toString());
+                chai.assert.isTrue(response.is_success);
+                chai.assert.isNull(response.error);
+                chai.assert.strictEqual(response.results[0], 'Response');
+                resolve();
+              })
+        }
+      )
+    )
+  );
 
-              consumer.disconnect()
-                .then(() => resolve())
+  it('Should return error message if onMsg resolves error', () =>
+    new Promise(resolve =>
+      consumer = rabbitMQ.consume('rpc-queue', () => Promise.reject('asdsd'), {
+        onConsuming: () =>
+          rabbitMQ.publishGetResponse('wasup', 'rpc-queue')
+            .then(response => {
+              response = JSON.parse(response.toString());
+              chai.assert.isFalse(response.is_success);
+              chai.assert.lengthOf(response.results, 0);
+              chai.assert.strictEqual(response.error, 'asdsd');
+              resolve();
             })
-      )
-    })
-  );
+      })
+    )
+  )
 
-  it('Should reject message on reject response', () =>
-    new Promise(resolve => {
-      let consumer = messageBus.consume(
-        'rpc-queue',
-        'my-exhange',
-        '#',
-        (channel, msg) => Promise.reject('I reject'),
-        () => messageBus.publish_getResponse('hi', 'my-exhange', 'rpc_queue')
-          .then(newMessage => {
-            newMessage = JSON.parse(newMessage.toString());
-            chai.assert.strictEqual(newMessage.error, 'I reject');
-            chai.assert.lengthOf(newMessage.results, 0);
-            chai.assert.isFalse(newMessage.is_success);
-
-            consumer.disconnect()
-              .then(() => resolve())
-          })
-      )
-    })
-  );
+  after(() => rabbitMQ.disconnect());
 });

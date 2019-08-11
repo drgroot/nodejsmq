@@ -15,6 +15,11 @@ test_simple:
   script: 
     - npm test
 
+test_coverage:
+  stage: test
+  script: 
+    - npm run-script coverage
+
 deploy_github:
   only:
     - master
@@ -30,3 +35,13 @@ deploy_github:
     - git remote rm origin
     - git remote add origin https://drgroot:$GITHUB_TOKEN@github.com/drgroot/$CI_PROJECT_NAME.git
     - git push origin $CI_COMMIT_REF_NAME --force
+
+publish:
+  stage: deploy
+  only:
+    - master
+  image: node
+  before_script:
+    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
+  script:
+    - npm publish

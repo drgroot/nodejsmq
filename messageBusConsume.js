@@ -1,54 +1,93 @@
 'use strict';
-const connection = require('./messageBusConnection.js');
 
-/**
- * Consumes onto a queue and an exchange with a given routing key
- * @param {String} queue_name Name of queue to subscribe to
- * @param {String} exchange_name Name of exchange to assert on
- * @param {Patter} routing_key Routing key pattern
- * @param {Function} onMsg Method called when receiving a message. First argument is Channel. Second argument is the message
- * @param {Function} connected Callback to execute when connected on queue. Return as promise. First argument is channel
- * @param {String} exchange_type Exchange type. Default topic
- */
-module.exports = (
-  queue_name,
-  exchange_name,
-  routing_key,
-  onMsg,
-  connected = () => true,
-  exchange_type = 'topic',
-  onSentMsg = () => true
-) => {
-  let channel = null;
+module.exports = function (connection) {
+  let default_options = {
+    prefetch: 1,
 
-  connection
-    .then(conn => conn.createChannel())
-    .then(chann => {
-      channel = chann;
+    exchangeName: '',
+    routingKey: false,
+    assertExchange: true,
+    assertExchangeType: 'direct',
+    assertExchangeOptions: {},
 
-      return channel.prefetch(1)
-        .then(() => channel.assertExchange(exchange_name, exchange_type))
-        .then(() => channel.assertQueue(queue_name))
-        .then(queue =>
-          channel.bindQueue(queue.queue, exchange_name, routing_key)
-            .then(
-              () => channel.consume(queue.queue, msg => consume(channel, onMsg, msg, onSentMsg))
-            )
-            .then(() => console.log(`Consuming on ${queue.queue}`))
-            .then(() => Promise.resolve(connected(channel)))
-        )
-    })
-    .catch(e => console.error(`Error consuming on ${queue_name}`, e));
+    assertQueue: true,
+    assertQueueOptions: {},
 
-  return {
-    disconnect: () => {
-      if (!channel) return Promise.reject('Channel closed!');
-      return channel.close();
+    onConsuming: () => Promise.resolve(true),
+    onSentMsg: () => Promise.resolve(true),
+  };
+
+  /**
+   * Consumes on a queue and binds onto the exchange
+   * @param {String} queueName Name of queue to consume
+   * @param {String} exchangeName Name of exchange to bind to
+   * @param {String} routingKey Routing key to use when binding on exchange. Defaults to queueName
+   * @param {Function} onMsg Function to handle consuming messages. First argument is message. Second argument is channel.
+   * @param {Object} options Consuming options object.
+   */
+  return (
+    queueName,
+    onMsg = () => Promise.resolve(true),
+    options = {}
+  ) => {
+    let channel = null;
+    options = { ...default_options, ...options };
+
+    connection
+      .then(conn => conn.createChannel())
+      .then(chan => {
+        channel = chan;
+        return chan.prefetch(options.prefetch);
+      })
+      .then(() =>
+        (options.assertExchange === false || options.exchangeName === '') ?
+          Promise.resolve(true) :
+          channel.assertExchange(
+            options.exchangeName,
+            options.assertExchangeType,
+            options.assertExchangeOptions
+          )
+      )
+      .then(() =>
+        (options.assertQueue === false) ?
+          Promise.resolve(true) :
+          channel.assertQueue(queueName, options.assertQueueOptions)
+            .then(() => Promise.resolve(channel))
+      )
+      .then(() =>
+        (options.assertExchange === false || options.exchangeName === '') ?
+          Promise.resolve(true) :
+          channel.bindQueue(
+            queueName,
+            options.exchangeName,
+            (options.routingKey === false) ? queueName : options.routingKey
+          )
+      )
+      .then(() =>
+        channel.consume(queueName, msg => consuming(channel, onMsg, msg, options.onSentMsg))
+      )
+      .then(() => Promise.resolve(options.onConsuming(channel)));
+
+    return {
+      /**
+       * Disconnects channel
+       */
+      disconnect: () => (channel === null) ?
+        Promise.reject('Channel closed!') :
+        channel.close()
+          .then(() => channel = null)
     }
   }
 }
 
-let consume = (channel, onMsg, msg, onSentMsg) => onMsg(channel, msg)
+/**
+ * Consumes on a channel
+ * @param {Channel} channel channel object
+ * @param {Function} onMsg Consume function. First argument is msg. Second argument is channel.
+ * @param {Message} msg AMQP message object.
+ * @param {Function} onSentMsg Triggers when message is acked or nacked. First argument is channel.
+ */
+let consuming = (channel, onMsg, msg, onSentMsg) => onMsg(msg, channel)
   .then(results => {
     if (results === null) {
       channel.nack(msg, false, false);
@@ -79,4 +118,4 @@ let consume = (channel, onMsg, msg, onSentMsg) => onMsg(channel, msg)
     }
     return Promise.resolve(channel.ack(msg));
   })
-  .then(() => onSentMsg());
+  .then(() => onSentMsg(channel));

@@ -1,40 +1,70 @@
 'use strict';
 const uuid = require('uuid/v1');
-const connection = require('./messageBusConnection.js');
 
-module.exports = {
-  noResponse: (
-    message, exchange_name, routing_key, exchange_type = 'topic'
-  ) => connection
-    .then(conn => conn.createChannel())
-    .then(channel =>
-      channel.assertExchange(exchange_name, exchange_type)
-        .then(
-          channel.publish(exchange_name, routing_key, Buffer.from(JSON.stringify(message)))
-        )
-        .then(() => channel.close())
-    ),
+module.exports = function (connection) {
+  return {
 
-  getResponse: (
-    message, exchange_name, routing_key, exchange_type = 'topic'
-  ) => connection
-    .then(conn => conn.createChannel())
-    .then(channel =>
-      channel.assertExchange(exchange_name, exchange_type)
-        .then(() =>
-          channel.assertQueue('', { durable: false })
-            .then(queue =>
-              sendMessageResponse(channel, queue.queue, exchange_name, routing_key, message)
+    /**
+    * Publishes a message without resolving a response
+    * @param {Any} message Message to send
+    * @param {String} routingKey Routing key to match to.
+    * @param {String} exchangeName Name of exchange to publish on. Default ''
+    */
+    noResponse: (
+      message,
+      routingKey,
+      exchangeName = '',
+    ) => connection
+      .then(conn => conn.createChannel())
+      .then(channel => {
+        channel.publish(
+          exchangeName,
+          routingKey,
+          Buffer.from(JSON.stringify(message))
+        );
+        return channel.close();
+      }),
+
+    /**
+    * Publishes a message and resolves the response
+    * @param {Any} message Message to send
+    * @param {String} routingKey Routing key to match to.
+    * @param {String} exchangeName Name of exchange to publish on. Default ''
+    */
+    getResponse: (
+      message,
+      routingKey,
+      exchangeName = '',
+    ) => connection
+      .then(conn => conn.createChannel())
+      .then(channel =>
+        channel.assertQueue('', { durable: false })
+          .then(queue =>
+            getResponse(
+              channel,
+              queue.queue,
+              exchangeName,
+              routingKey,
+              message
             )
-        )
-    ),
+          )
+      )
+  }
 }
 
-let sendMessageResponse = (channel, replyTo, exchange_name, routing_key, message) =>
+/**
+ * Publishes a message and resolves the response
+ * @param {Channel} channel Channel object
+ * @param {String} replyTo Name of queue to listen for response
+ * @param {String} exchangeName Name of exchange to publish on. Default ''
+ * @param {String} routingKey Routing key to send to
+ * @param {Any} message Message to send
+ */
+let getResponse = (channel, replyTo, exchangeName, routingKey, message) =>
   new Promise(resolve => {
     let correlationId = uuid();
 
-    channel.publish(exchange_name, routing_key, Buffer.from(JSON.stringify(message)), {
+    channel.publish(exchangeName, routingKey, Buffer.from(JSON.stringify(message)), {
       correlationId: correlationId,
       replyTo: replyTo
     });
