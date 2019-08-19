@@ -7,7 +7,7 @@ A simple rabbitmq implementation
 const nodeMQ = require('nodejsmq')('amqp://rabbitmq/'); // Connection url
 nodeMQ.consume(
   'my-queue',
-  (msg,channel) => Promise.resolve('I recieved a message')
+  (msg,channel) => nodeMQ.reply(msg,channel,'I send a message in response!')
 )
 
 nodeMQ.publishNoResponse(['my data','to send'],'a-queue')
@@ -25,7 +25,7 @@ nodeMQ.**consume** (queue_name, consume_function, options)
  * `consume_function` Handle recieved messages
  * `options` Consumption object
 
-Listens on specified queue. Callback function used to handle messages recieved. Should return a promise with results (scalar or array). This will be sent to the reciever (if there is one). Messages will be `acked` on success. Returning `null` will `nack` the message and will not be requeued. Rejects will be caught and message will be `acked`, response will contain error message.
+Listens on specified queue. Callback function used to handle messages recieved. Consume function takes message as first parameter and chanel as the second parameter.
 
 Options accepts the following parameters:
 
@@ -39,6 +39,15 @@ Options accepts the following parameters:
 | `routingKey`  | `''` | Routing key to use when binding to an exchange |
 | `assertQueue`  | `true` | If true, assert the queue into existence. |
 | `assertQueueOptions`  | `{}` | Options to pass when asserting the queue |
+
+nodeMQ.**reply** (message, channel, response) [Promise]
+
+ * `message` Content to send
+ * `channel` Channel being used for consumption
+ * `response` Content used to response
+
+Replies to a message. `response` will be packed into a binary before being sent. If message is not meant to replied to, it will not reply with anything. It will ack the message.
+
 
 ### Publishing
 
@@ -69,4 +78,4 @@ Returns a promise containing the connection object to the messaging bus.
 
 nodeMQ.**disconnect** () [Promise]
 
- Disconnects from the messaging bus.
+Disconnects from the messaging bus.

@@ -13,14 +13,14 @@ describe('Publisher', function () {
   it('Should send a response without accepting reply', () =>
     new Promise(resolve =>
       consumer = rabbitMQ.consume(
-        'rpc-queue', msg => {
+        'rpc-queue2', (msg, channel) => {
           let value = JSON.parse(msg.content.toString());
           chai.assert.strictEqual(value, 'my messag');
-          return Promise.resolve(true);
+          rabbitMQ.reply(msg, channel, true)
+            .then(() => resolve())
         },
         {
-          onConsuming: () => rabbitMQ.publishNoResponse('my messag', 'rpc-queue'),
-          onSentMsg: () => resolve()
+          onConsuming: () => rabbitMQ.publishNoResponse('my messag', 'rpc-queue2'),
         }
       )
     )
@@ -30,22 +30,19 @@ describe('Publisher', function () {
   it('Should send a response', () =>
     new Promise(resolve =>
       consumer = rabbitMQ.consume(
-        'rpc-queue', msg => {
+        'rpc-queue', (msg, channel) => {
           let value = JSON.parse(msg.content.toString());
           chai.assert.strictEqual(value, 'hi');
-          return Promise.resolve('Response');
+          rabbitMQ.reply(msg, channel, 'Response');
         },
         {
           onConsuming: () =>
             rabbitMQ.publishGetResponse('hi', 'rpc-queue')
               .then(response => {
                 response = JSON.parse(response.toString());
-                chai.assert.isTrue(response.is_success);
-                chai.assert.isNull(response.error);
-                chai.assert.strictEqual(response.results[0], 'Response');
+                chai.assert.strictEqual(response, 'Response');
                 resolve();
               }),
-          onSentMsg: () => resolve()
         }
       )
     )

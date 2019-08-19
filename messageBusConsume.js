@@ -14,7 +14,6 @@ module.exports = function (connection) {
     assertQueueOptions: {},
 
     onConsuming: () => Promise.resolve(true),
-    onSentMsg: () => Promise.resolve(true),
   };
 
   /**
@@ -27,7 +26,7 @@ module.exports = function (connection) {
    */
   return (
     queueName,
-    onMsg = () => Promise.resolve(true),
+    onMsg,
     options = {}
   ) => {
     let channel = null;
@@ -64,7 +63,10 @@ module.exports = function (connection) {
           )
       )
       .then(() =>
-        channel.consume(queueName, msg => consuming(channel, onMsg, msg, options.onSentMsg))
+        channel.consume(
+          queueName,
+          msg => onMsg(msg, channel)
+        )
       )
       .then(() => Promise.resolve(options.onConsuming(channel)));
 
@@ -79,43 +81,3 @@ module.exports = function (connection) {
     }
   }
 }
-
-/**
- * Consumes on a channel
- * @param {Channel} channel channel object
- * @param {Function} onMsg Consume function. First argument is msg. Second argument is channel.
- * @param {Message} msg AMQP message object.
- * @param {Function} onSentMsg Triggers when message is acked or nacked. First argument is channel.
- */
-let consuming = (channel, onMsg, msg, onSentMsg) => onMsg(msg, channel)
-  .then(results => {
-    if (results === null) {
-      channel.nack(msg, false, false);
-      return false;
-    }
-    return {
-      is_success: true,
-      results: (results.constructor === Array) ? results : [results],
-      error: null
-    }
-  })
-  .catch(e => {
-    return {
-      is_success: false,
-      results: [],
-      error: e
-    }
-  })
-  .then(content => {
-    if (!content) return Promise.resolve();
-    if (msg.properties.replyTo !== null && typeof msg.properties.replyTo != 'undefined') {
-      channel.publish(
-        '',
-        msg.properties.replyTo,
-        Buffer.from(JSON.stringify(content)),
-        { correlationId: msg.properties.correlationId }
-      );
-    }
-    return Promise.resolve(channel.ack(msg));
-  })
-  .then(() => onSentMsg(channel));

@@ -21,6 +21,7 @@ module.exports = function (connection_url) {
     disconnect: () => connection.close(),
 
     consume: require('./messageBusConsume.js')(connect()),
+    reply: require('./messageBusReply.js'),
 
     publishNoResponse: publish.noResponse,
     publishGetResponse: publish.getResponse,
