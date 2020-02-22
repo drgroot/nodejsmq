@@ -38,7 +38,11 @@ module.exports = function (connection) {
     ) => connection
       .then(conn => conn.createChannel())
       .then(channel =>
-        channel.assertQueue('', { durable: false })
+        channel.assertQueue('', {
+          durable: false,
+          exclusive: true,
+          autoDelete: true,
+        })
           .then(queue =>
             getResponse(
               channel,
