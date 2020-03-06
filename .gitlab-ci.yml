@@ -4,21 +4,23 @@ stages:
 
 image: node
 variables:
-  MESSAGEBUS_URL: amqp://rabbitmq/
+  CLOUDAMQP_URL: amqp://rabbitmq/
 services:
   - rabbitmq
 before_script:
   - npm install
 
-test_simple:
+package_version:
   stage: test
-  script: 
-    - npm test
+  script:
+    - PACKAGE_VERSION=$(node -p -e "require('./package.json').version")
+    - PUBLISHED_VERSION=$(npm view nodejsmq version)
+    - if [ "$PUBLISHED_VERSION" == "$PACKAGE_VERSION" ]; then exit 1; fi
 
-test_coverage:
+test:
   stage: test
   script: 
-    - npm run-script coverage
+    - npm run-script test
 
 deploy_github:
   only:
@@ -44,4 +46,5 @@ publish:
   before_script:
     - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
   script:
+    - npm run-script build
     - npm publish

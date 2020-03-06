@@ -1,95 +1,97 @@
-'use strict';
-const chai = require('chai');
-let url = (process.env['MESSAGEBUS_URL']) ?
-  process.env['MESSAGEBUS_URL'] :
-  'amqp://127.0.0.1';
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { assert } from 'chai';
+import nodeMQ from './app';
 
-describe('Consumer', function () {
-  let rabbitMQ = null;
-  let consumer = null;
+describe('Consumer', () => {
+  let consumer;
 
-  before(() => rabbitMQ = require('../')(url));
-  afterEach(() => consumer.disconnect());
+  it('Should consume onto a named queue', () => new Promise((resolve) => {
+    consumer = nodeMQ.consume({
+      queueName: 'myqueue',
+      onConsuming: (queue) => {
+        consumer.disconnect();
+        assert.strictEqual(queue, 'myqueue');
+        resolve();
+      },
+    });
+  }));
 
-  it('Should stop consuming gracefully', () =>
-    new Promise(resolve =>
-      consumer = rabbitMQ.consume(
-        'rpc-queue', () => Promise.resolve(true), {
-          onConsuming: () => resolve()
-        }
-      )
-    )
-  );
+  it('should consume onto an unamed queue', () => new Promise((resolve) => {
+    consumer = nodeMQ.consume({
+      onConsuming: (queue) => {
+        consumer.disconnect();
+        assert.isString(queue);
+        resolve();
+      },
+    });
+  }));
 
-  it('Should follow routing rules', () =>
-    new Promise(resolve =>
-      consumer = rabbitMQ.consume(
-        'rpc-queue',
-        (msg, channel) => rabbitMQ.reply(msg, channel, 'l'),
-        {
-          exchangeName: 'myExchange',
-          routingKey: '*.log',
-          assertExchangeType: 'topic',
-          onConsuming: () =>
-            rabbitMQ.publishGetResponse('my message', 'random.log', 'myExchange')
-              .then(response => {
-                response = JSON.parse(response.toString());
-                chai.assert.strictEqual(response, 'l');
-                resolve();
-              })
-        }
-      )
-    )
-  )
+  describe('direct exchange', () => {
+    const name = 'myqueue';
 
-  it('Should nack the message on null response', () =>
-    new Promise((resolve, reject) =>
-      consumer = rabbitMQ.consume(
-        'rpc-queue',
-        (msg, channel) => {
-          channel.nack(msg);
-          setTimeout(() => resolve(), 1500);
+    it('should consume onto direct exchange without issue', () => new Promise((resolve) => {
+      consumer = nodeMQ.consume({
+        queueName: name,
+        onConsuming: (queue) => {
+          consumer.disconnect();
+          assert.strictEqual(queue, name);
+          resolve();
         },
-        {
-          onConsuming: () =>
-            rabbitMQ.publishGetResponse('asdad', 'rpc-queue')
-              .then(() => reject('Should not get resolve')),
-        }
-      )
-    )
-  )
+      });
+    }));
 
-  it('Should ack knowledge message using promise', () =>
-    new Promise(resolve =>
-      consumer = rabbitMQ.consume(
-        'rpc-queue',
-        (msg, channel) => rabbitMQ.reply(msg, channel, 'Response'),
-        {
-          onConsuming: () =>
-            rabbitMQ.publishGetResponse('hi', 'rpc-queue')
-              .then(response => {
-                response = JSON.parse(response.toString());
-                chai.assert.strictEqual(response, 'Response');
-                resolve();
-              })
-        }
-      )
-    )
-  );
+    it('should recieve messages and encode/decode message', () => new Promise((resolve) => {
+      const message = [1, 2, 3];
+      consumer = nodeMQ.consume({
+        queueName: name,
+        onConsuming: () => nodeMQ.publish(name, message),
+        onMessage: (msg, channel, body) => {
+          nodeMQ.reply(msg, channel);
+          consumer.disconnect();
+          assert.deepStrictEqual(body, message);
+          resolve();
+        },
+      });
+    }));
+  });
 
-  it('Should return promise on message without replyTo', () =>
-    new Promise(resolve =>
-      consumer = rabbitMQ.consume(
-        'rpc-queue',
-        (msg, channel) => rabbitMQ.reply(msg, channel, 'Response')
-          .then(() => resolve()),
-        {
-          onConsuming: () => rabbitMQ.publishNoResponse('hi', 'rpc-queue')
+  describe('exchange', () => {
+    const queueName = 'exchangeQ';
+    const message = { a: 1 };
+    const sendMessage = (exchange, route) => nodeMQ
+      .publish(route, message, { exchangeName: exchange });
 
-        }
-      )
-    )
-  )
+    it('should bind using queueName if no routing key given', () => new Promise((resolve) => {
+      consumer = nodeMQ.consume({
+        queueName,
+        onConsuming: () => sendMessage('exchange', queueName),
+        onMessage: (msg, channel, body) => {
+          nodeMQ.reply(msg, channel);
+          consumer.disconnect();
+          assert.deepStrictEqual(body, message);
+          resolve();
+        },
+        assertExchange: true,
+        exchangeName: 'exchange',
+      });
+    }));
 
-  after(() => rabbitMQ.disconnect());
+    it('should adhere to routing key if given', () => new Promise((resolve) => {
+      consumer = nodeMQ.consume({
+        queueName: 'logHandler',
+        onConsuming: () => sendMessage('exchangeTopic', 'log.error'),
+        onMessage: (msg, channel, body) => {
+          nodeMQ.reply(msg, channel);
+          consumer.disconnect();
+          assert.deepStrictEqual(body, message);
+          assert.strictEqual(msg.fields.routingKey, 'log.error');
+          resolve();
+        },
+        routingKey: 'log.*',
+        assertExchange: true,
+        assertExchangeType: 'topic',
+        exchangeName: 'exchangeTopic',
+      });
+    }));
+  });
 });
