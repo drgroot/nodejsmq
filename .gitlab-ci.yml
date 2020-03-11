@@ -43,8 +43,7 @@ publish:
   only:
     - master
   image: node
-  before_script:
-    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
   script:
+    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
     - npm run-script build
     - npm publish
