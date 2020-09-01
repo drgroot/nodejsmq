@@ -17,9 +17,15 @@ package_version:
     - PUBLISHED_VERSION=$(npm view nodejsmq version)
     - if [ "$PUBLISHED_VERSION" == "$PACKAGE_VERSION" ]; then exit 1; fi
 
+audit:
+  stage: test
+  script: 
+    - npm audit
+
 test:
   stage: test
   script: 
+    - sleep 30
     - npm run-script test
 
 deploy_github:

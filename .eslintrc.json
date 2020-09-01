@@ -4,13 +4,20 @@
   ],
   "env": {
     "es6": true,
-    "browser": true,
     "mocha": true
   },
   "rules": {
     "no-restricted-syntax": [
       2,
       "BinaryExpression[operator='in']"
+    ],
+    "import/no-extraneous-dependencies": [
+      "error",
+      {
+        "devDependencies": [
+          "**/test/**"
+        ]
+      }
     ]
   }
 }
