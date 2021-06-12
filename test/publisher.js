@@ -13,7 +13,6 @@ describe('publisher', () => {
     });
   }));
 
-
   it('should resolve the response', () => nodeMQ.publishMessage('myqueue123', 'hi')
     .then((body) => {
       assert.deepStrictEqual(body, response);
