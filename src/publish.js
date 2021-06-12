@@ -31,7 +31,6 @@ const basicPublish = (
     return channel.close();
   });
 
-
 const publisher = (connection) => ({
   publish: (routingKey, message, options) => basicPublish(connection, routingKey, message, options),
 

@@ -4,7 +4,7 @@ stages:
 
 image: node
 variables:
-  CLOUDAMQP_URL: amqp://rabbitmq/
+  CLOUDAMQP_URL: amqp://127.0.0.1/
 services:
   - rabbitmq
 before_script:
@@ -21,6 +21,11 @@ test:
   stage: test
   script: 
     - npm run-script test
+
+lint:
+  stage: test
+  script:
+    - npx eslint src
 
 publish:
   stage: deploy
