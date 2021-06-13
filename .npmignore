@@ -27,3 +27,7 @@ CHANGELOG.md
 .babelrc
 .gitignore
 .git
+.tsconfig.json
+.npmignore
+.jsdoc.conf
+docs/

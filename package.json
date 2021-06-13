@@ -1,33 +1,33 @@
 {
   "name": "nodejsmq",
-  "version": "0.1.7",
+  "version": "1.0.0",
   "description": "A simple rabbitmq implementation",
   "main": "./lib/index.js",
   "scripts": {
-    "build": "NODE_ENV=production babel src --out-dir lib",
-    "test": "nyc --reporter=text mocha --require @babel/register --exit --exclude test/app.js test",
-    "docs": "jsdoc src --recurse --readme ./README.md --destination ./docs -c ./.jsdoc.conf"
+    "build": "NODE_ENV=production tsc -p .",
+    "test": "TS_NODE_PROJECT='./tsconfig.testing.json' mocha --exit -r ts-node/register tests/**/*.ts",
+    "docs": "typedoc src --readme ./README.md --out ./docs"
   },
   "files": [
     "lib",
     "src"
   ],
   "devDependencies": {
-    "@babel/cli": "7.14.5",
-    "@babel/core": "7.14.5",
-    "@babel/node": "7.14.5",
-    "@babel/preset-env": "7.14.5",
-    "@babel/register": "7.14.5",
+    "@types/amqplib": "0.8.0",
+    "@types/chai": "4.2.18",
+    "@types/mocha": "8.2.2",
+    "@typescript-eslint/eslint-plugin": "4.26.1",
+    "@typescript-eslint/parser": "4.26.1",
     "chai": "4.3.4",
-    "eslint-config-airbnb": "18.2.1",
-    "eslint-plugin-import": "2.23.4",
-    "jsdoc": "3.6.7",
-    "mocha": "9.0.0",
-    "nyc": "15.1.0"
+    "eslint": "7.28.0",
+    "eslint-config-airbnb-typescript": "12.3.1",
+    "mocha": "8.4.0",
+    "ts-node": "10.0.0",
+    "typedoc": "0.21.0-beta.2",
+    "typescript": "4.3.2"
   },
   "dependencies": {
-    "amqplib": "0.8.0",
-    "eslint": "7.28.0"
+    "amqplib": "0.8.0"
   },
   "repository": {
     "type": "git",
@@ -41,11 +41,6 @@
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/drgroot/nodeMQ/issues"
-  },
-  "nyc": {
-    "exclude": [
-      "test/*.js"
-    ]
   },
   "homepage": "https://github.com/drgroot/nodeMQ",
   "author": "Yusuf Ali <ali@yusuf.email> (https://yusufali.ca)"
