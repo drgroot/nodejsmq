@@ -22,12 +22,16 @@ interface ConsumerOptions {
 };
 
 interface MessageHandler {
-  (message: Message | null, channel: Channel, body: any): any
+  (message: Message | null, channel: Channel, body: any): void
 };
 
 interface ConsumingCallback {
-  (queueName?: string, channel?: Channel): any
+  (queueName?: string, channel?: Channel): void
 };
+
+interface Consumer {
+  disconnect(): Promise<true>;
+}
 
 export default class NodeMQ {
   private connectionURL: string;
@@ -46,7 +50,7 @@ export default class NodeMQ {
   /**
    * @description closes the connection
    */
-  disconnect() {
+  disconnect(): void {
     this.connection
       .then((conn: Connection) => conn.close())
       .then(() => { this.connection = null; })
@@ -62,7 +66,7 @@ export default class NodeMQ {
     routingKey: string,
     message: any,
     { exchangeName = '', contentType = 'application/json', contentEncoding = 'base64' }: PublishOptions = {}
-  ) {
+  ): Promise<any> {
     return ((this.connection) ? this.connection : this.connect())
       .then((conn: Connection) => conn.createChannel())
       .then((channel: Channel) => {
@@ -89,7 +93,7 @@ export default class NodeMQ {
       prefetch = 1,
 
       exchangeName = '',
-      routingKey = false,
+      routingKey,
       queueName = 'test',
       assertQueue = true,
       assertQueueOptions = {},
@@ -101,7 +105,7 @@ export default class NodeMQ {
       prefetch?: number,
 
       exchangeName?: string,
-      routingKey?: any,
+      routingKey?: string,
       queueName?: string,
       assertQueue?: boolean,
       assertQueueOptions?: AssertQueueOptions,
@@ -109,52 +113,51 @@ export default class NodeMQ {
       consumeOptions?: ConsumerOptions,
       consumeCallback?: ConsumingCallback,
     } = {}
-  ): any {
+  ): Consumer {
     let channel: Channel;
 
     ((this.connection) ? this.connection : this.connect())
       .then((conn: Connection) => conn.createChannel())
       .then((chan: Channel) => { channel = chan; })
       .then(() => channel.prefetch(prefetch))
-      .then(async () => {
-        if (assertQueue) {
-          await channel.assertQueue(queueName, assertQueueOptions);
-        }
+      .then(() => (assertQueue) ? channel.assertQueue(queueName, { exclusive: false, durable: true, autoDelete: false, ...assertQueueOptions }) : false)
+      .then(
+        () => (exchangeName !== '') ? channel.bindQueue(
+          queueName, exchangeName, routingKey || queueName
+        ) : false
+      )
+      .then(
+        () => channel.consume(
+          queueName,
+          (msg: null | Message) => {
+            let body = msg?.content;
+            if (msg?.properties.contentEncoding) {
+              body = decode(body, msg?.properties.contentEncoding);
+            }
 
-        if (routingKey) {
-          await channel.bindQueue(queueName, exchangeName, routingKey);
-        }
-
-        Promise.resolve(channel)
-          .then(() => {
-            channel.consume(queueName, (msg: any) => {
-              let body = msg?.content;
-
-              if (msg?.properties.contentEncoding) {
-                body = decode(body, msg?.properties.contentEncoding);
+            if (msg?.properties.contentType) {
+              try {
+                body = unpack(body, msg?.properties.contentType);
+              } catch (e) {
+                // pass
               }
+            }
 
-              if (msg?.properties.contentType) {
-                try {
-                  body = unpack(body, msg?.properties.contentType);
-                } catch (e) {
-                  // pass
-                }
-              }
-
-              if (onMessage) {
-                onMessage(msg, channel, body)
-              }
-            }, consumeOptions);
-          })
-          .then(() => consumeCallback(queueName, channel));
-      })
+            if (onMessage) {
+              onMessage(msg, channel, body)
+            }
+          },
+          consumeOptions
+        )
+      )
+      .then(() => consumeCallback(queueName, channel))
 
     return {
       disconnect: () => {
         if (channel === null) return Promise.resolve(true);
 
-        return channel.close();
+        return new Promise((resolve) => channel.close()
+          .then(() => resolve(true)));
       }
     }
   }

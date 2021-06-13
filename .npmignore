@@ -18,7 +18,7 @@ yarn.lock
 
 # project files
 src
-test
+tests
 examples
 CHANGELOG.md
 .editorconfig

@@ -2,7 +2,7 @@ stages:
   - test
   - deploy
 
-image: node
+image: node:lts
 variables:
   CLOUDAMQP_URL: amqp://127.0.0.1/
 services:
@@ -26,14 +26,12 @@ test:
 lint:
   stage: test
   script:
-    - npm run-script build
+    - npm run-script tsc
 
 publish:
   stage: deploy
   only:
     - master
-  image: node
   script:
     - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
-    - npm run-script build
     - npm publish
