@@ -19,13 +19,14 @@ package_version:
 
 test:
   stage: test
-  script: 
+  script:
+    - sleep 40s
     - npm run-script test
 
 lint:
   stage: test
   script:
-    - npx eslint src
+    - npm run-script build
 
 publish:
   stage: deploy
