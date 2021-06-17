@@ -1,12 +1,11 @@
 {
   "name": "nodejsmq",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A simple rabbitmq implementation",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
   "scripts": {
-    "tsc": "NODE_ENV=production tsc -p tsconfig.json && tsc -p tsconfig.cjs.json",
-    "prepublish": "npm run tsc",
+    "build": "NODE_ENV=production tsc -p tsconfig.json && tsc -p tsconfig.cjs.json",
     "test": "TS_NODE_PROJECT='./tsconfig.testing.json' mocha --exit -r ts-node/register tests/**/*.ts",
     "docs": "typedoc src --readme ./README.md --out ./docs"
   },

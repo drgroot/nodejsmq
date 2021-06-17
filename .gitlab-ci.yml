@@ -26,7 +26,7 @@ test:
 lint:
   stage: test
   script:
-    - npm run-script tsc
+    - npm run-script build
     - npx eslint src
 
 publish:
@@ -35,4 +35,5 @@ publish:
     - master
   script:
     - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
+    - npm run-script build
     - npm publish
