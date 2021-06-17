@@ -27,6 +27,7 @@ lint:
   stage: test
   script:
     - npm run-script tsc
+    - npx eslint src
 
 publish:
   stage: deploy

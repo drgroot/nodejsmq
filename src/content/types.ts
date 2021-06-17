@@ -28,12 +28,14 @@ const findType = (name: ContentTypeName): ContentType => {
       contentType: 'text/plain',
       pack: (v: string): string => v,
       unpack: (v: string): string => v,
-    }
+    },
   ] = types.filter((t) => t.contentType === name);
 
   return type;
-}
+};
 
-export const unpack = (content: any, contentType: ContentTypeName): any => findType(contentType).unpack(content);
+export const unpack = (content: any, contentType: ContentTypeName): any => findType(contentType)
+  .unpack(content);
 
-export const pack = (content: any, contentType: ContentTypeName): any => findType(contentType).pack(content);
+export const pack = (content: any, contentType: ContentTypeName): any => findType(contentType)
+  .pack(content);

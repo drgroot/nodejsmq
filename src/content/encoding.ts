@@ -19,7 +19,7 @@ const encodings: [Encoding] = [
     name: 'base64',
     decode: (v) => v.toString(),
     encode: (v) => Buffer.from(v),
-  }
+  },
 ];
 
 const findType = (name: EncodingTypeName): Encoding => {
@@ -30,8 +30,10 @@ const findType = (name: EncodingTypeName): Encoding => {
   };
 
   return type;
-}
+};
 
-export const decode = (content: any, encoding: EncodingTypeName): any => findType(encoding).decode(content);
+export const decode = (content: any, encoding: EncodingTypeName): any => findType(encoding)
+  .decode(content);
 
-export const encode = (content: any, encoding: EncodingTypeName): any => findType(encoding).encode(content);
+export const encode = (content: any, encoding: EncodingTypeName): any => findType(encoding)
+  .encode(content);

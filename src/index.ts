@@ -6,28 +6,28 @@ interface PublishOptions {
   exchangeName?: string,
   contentType?: ContentTypeName,
   contentEncoding?: EncodingTypeName,
-};
+}
 
 interface AssertQueueOptions {
   exclusive?: boolean,
   durable?: boolean,
   autoDelete?: boolean,
-};
+}
 
 interface ConsumerOptions {
   consumerTag?: string,
   noLocal?: boolean,
   noAck?: boolean,
   exclusive?: true,
-};
+}
 
 interface MessageHandler {
   (message: Message | null, channel: Channel, body: any): void
-};
+}
 
 interface ConsumingCallback {
   (queueName?: string, channel?: Channel): void
-};
+}
 
 interface Consumer {
   disconnect(): Promise<true>;
@@ -35,6 +35,7 @@ interface Consumer {
 
 export default class NodeMQ {
   private connectionURL: string;
+
   public connection: any;
 
   constructor(connectionUrl: string) {
@@ -53,19 +54,19 @@ export default class NodeMQ {
   disconnect(): void {
     this.connection
       .then((conn: Connection) => conn.close())
-      .then(() => { this.connection = null; })
+      .then(() => { this.connection = null; });
   }
 
   /**
    * @description Sends a message along rabbitMQ
    * @param routingKey string routingKey of the consumer to send to
-   * @param message the message to send 
+   * @param message the message to send
    * @param {PublishOptions} options
    */
   publish(
     routingKey: string,
     message: any,
-    { exchangeName = '', contentType = 'application/json', contentEncoding = 'base64' }: PublishOptions = {}
+    { exchangeName = '', contentType = 'application/json', contentEncoding = 'base64' }: PublishOptions = {},
   ): Promise<any> {
     return ((this.connection) ? this.connection : this.connect())
       .then((conn: Connection) => conn.createChannel())
@@ -79,8 +80,8 @@ export default class NodeMQ {
           encodedMessage,
           {
             contentType,
-            contentEncoding
-          }
+            contentEncoding,
+          },
         );
 
         return channel.close();
@@ -112,7 +113,7 @@ export default class NodeMQ {
 
       consumeOptions?: ConsumerOptions,
       consumeCallback?: ConsumingCallback,
-    } = {}
+    } = {},
   ): Consumer {
     let channel: Channel;
 
@@ -120,11 +121,19 @@ export default class NodeMQ {
       .then((conn: Connection) => conn.createChannel())
       .then((chan: Channel) => { channel = chan; })
       .then(() => channel.prefetch(prefetch))
-      .then(() => (assertQueue) ? channel.assertQueue(queueName, { exclusive: false, durable: true, autoDelete: false, ...assertQueueOptions }) : false)
       .then(
-        () => (exchangeName !== '') ? channel.bindQueue(
-          queueName, exchangeName, routingKey || queueName
-        ) : false
+        () => ((assertQueue)
+          ? channel.assertQueue(
+            queueName,
+            {
+              exclusive: false, durable: true, autoDelete: false, ...assertQueueOptions,
+            },
+          ) : false),
+      )
+      .then(
+        () => ((exchangeName !== '') ? channel.bindQueue(
+          queueName, exchangeName, routingKey || queueName,
+        ) : false),
       )
       .then(
         () => channel.consume(
@@ -144,13 +153,13 @@ export default class NodeMQ {
             }
 
             if (onMessage) {
-              onMessage(msg, channel, body)
+              onMessage(msg, channel, body);
             }
           },
-          consumeOptions
-        )
+          consumeOptions,
+        ),
       )
-      .then(() => consumeCallback(queueName, channel))
+      .then(() => consumeCallback(queueName, channel));
 
     return {
       disconnect: () => {
@@ -158,7 +167,7 @@ export default class NodeMQ {
 
         return new Promise((resolve) => channel.close()
           .then(() => resolve(true)));
-      }
-    }
+      },
+    };
   }
 }
