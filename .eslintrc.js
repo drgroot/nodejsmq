@@ -1,11 +1,25 @@
 module.exports = {
-  root: true,
-  parser: '@typescript-eslint/parser',
-  plugins: ['@typescript-eslint'],
+  env: {
+    browser: true,
+    es2021: true,
+  },
   extends: [
-    'airbnb-typescript'
+    'airbnb-base',
+    'airbnb-typescript/base'
   ],
+  parser: '@typescript-eslint/parser',
   parserOptions: {
+    ecmaVersion: 13,
+    sourceType: 'module',
     project: './tsconfig.json'
+  },
+  plugins: [
+    '@typescript-eslint',
+  ],
+  rules: {
+    'no-restricted-syntax': [
+      2,
+      "BinaryExpression[operator='in']"
+    ]
   }
-}
+};

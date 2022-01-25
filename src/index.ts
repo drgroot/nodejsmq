@@ -2,35 +2,39 @@ import amqplib, { Connection, Channel, Message } from 'amqplib';
 import { unpack, pack, ContentTypeName } from './content/types';
 import { decode, encode, EncodingTypeName } from './content/encoding';
 
-interface PublishOptions {
+export interface PublishOptions {
   exchangeName?: string,
   contentType?: ContentTypeName,
   contentEncoding?: EncodingTypeName,
+  replyTo?: string
+  correlationId?: string
+  [key: string]: any
 }
 
-interface AssertQueueOptions {
+export interface AssertQueueOptions {
   exclusive?: boolean,
   durable?: boolean,
   autoDelete?: boolean,
 }
 
-interface ConsumerOptions {
+export interface ConsumerOptions {
   consumerTag?: string,
   noLocal?: boolean,
   noAck?: boolean,
   exclusive?: true,
 }
 
-interface MessageHandler {
-  (message: Message | null, channel: Channel, body: any): void
+export interface MessageHandler<T> {
+  (message: Message | null, channel: Channel, body: T | undefined | Buffer): void
 }
 
-interface ConsumingCallback {
+export interface ConsumingCallback {
   (queueName?: string, channel?: Channel): void
 }
 
 interface Consumer {
   disconnect(): Promise<true>;
+  reply(message: Message, channel: Channel, response: any): Promise<any>;
 }
 
 export default class NodeMQ {
@@ -66,7 +70,12 @@ export default class NodeMQ {
   publish(
     routingKey: string,
     message: any,
-    { exchangeName = '', contentType = 'application/json', contentEncoding = 'base64' }: PublishOptions = {},
+    {
+      exchangeName = '',
+      contentType = 'application/json',
+      contentEncoding = 'base64',
+      ...options
+    }: PublishOptions = {},
   ): Promise<any> {
     return ((this.connection) ? this.connection : this.connect())
       .then((conn: Connection) => conn.createChannel())
@@ -79,6 +88,7 @@ export default class NodeMQ {
           routingKey,
           encodedMessage,
           {
+            ...options,
             contentType,
             contentEncoding,
           },
@@ -88,21 +98,21 @@ export default class NodeMQ {
       });
   }
 
-  consume(
+  consume<T>(
     {
       onMessage,
       prefetch = 1,
 
       exchangeName = '',
       routingKey,
-      queueName = 'test',
+      queueName = `amqp.${(new Date()).getTime().toString()}`,
       assertQueue = true,
       assertQueueOptions = {},
 
       consumeOptions = {},
       consumeCallback = () => true,
     }: {
-      onMessage?: MessageHandler,
+      onMessage?: MessageHandler<T>,
       prefetch?: number,
 
       exchangeName?: string,
@@ -131,9 +141,7 @@ export default class NodeMQ {
           ) : false),
       )
       .then(
-        () => ((exchangeName !== '') ? channel.bindQueue(
-          queueName, exchangeName, routingKey || queueName,
-        ) : false),
+        () => ((exchangeName !== '') ? channel.bindQueue(queueName, exchangeName, routingKey || queueName) : false),
       )
       .then(
         () => channel.consume(
@@ -165,9 +173,77 @@ export default class NodeMQ {
       disconnect: () => {
         if (channel === null) return Promise.resolve(true);
 
-        return new Promise((resolve) => channel.close()
-          .then(() => resolve(true)));
+        return new Promise((resolve) => {
+          channel.close()
+            .then(() => resolve(true));
+        });
+      },
+
+      reply: (message, ch, response) => {
+        if (message.properties.replyTo) {
+          this.publish(
+            message.properties.replyTo,
+            response,
+            {
+              exchangeName: message.fields.exchange || exchangeName,
+              contentType: message.properties.contentType,
+              contentEncoding: message.properties.contentEncoding,
+              correlationId: message.properties.correlationId,
+            },
+          );
+        }
+
+        return Promise.resolve(ch.ack(message));
       },
     };
+  }
+
+  rpcPublish<T>(
+    routingKey: string,
+    message: any,
+    {
+      exchangeName = '',
+      contentType = 'application/json',
+      contentEncoding = 'base64',
+      ...options
+    }: PublishOptions = {},
+  ) {
+    return new Promise((resolve, reject) => {
+      const datetime = (new Date()).getTime();
+      const randomNums = Math.random();
+      const correlationId = `${datetime}${randomNums}`;
+
+      this.consume<T>({
+        assertQueue: true,
+        assertQueueOptions: { exclusive: true, durable: false, autoDelete: true },
+        onMessage: (msg, channel, body) => {
+          if (msg?.properties.correlationId === correlationId) {
+            channel.ack(msg);
+            channel.close()
+              .then(() => resolve(body || msg));
+          } else if (msg) {
+            channel.nack(msg);
+          }
+        },
+        consumeCallback: (replyTo) => {
+          if (replyTo) {
+            this.publish(
+              routingKey,
+              message,
+              {
+                ...options,
+                exchangeName,
+                contentType,
+                contentEncoding,
+                correlationId,
+                replyTo,
+              },
+            );
+          } else {
+            reject(new Error('Unable to form queue for replyTo'));
+          }
+        },
+      });
+    });
   }
 }
